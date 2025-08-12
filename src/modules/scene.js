@@ -33,4 +33,4 @@ function updateCameraPosition(x, y, z) {
 
     camera.lookAt(new THREE.Vector3(x, y, z));
 }
-export { scene, camera, renderer, ambientLight, sunLight };
+export { scene, camera, renderer, ambientLight, sunLight, updateCameraPosition };

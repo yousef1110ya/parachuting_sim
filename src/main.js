@@ -1,6 +1,6 @@
 
 import * as THREE from 'three';
-import { scene, camera, renderer } from './modules/scene.js';
+import { scene, camera, renderer,updateCameraPosition } from './modules/scene.js';
 import { ground, cloudLayer, loadCities } from './modules/environment.js';
 import { Parachutist } from './modules/parachutist.js';
 import { Airplane } from './modules/airplane.js';
@@ -66,7 +66,9 @@ Promise.all([
         airplane.update(deltaTime);
 
         if (parachutist.hasJumped) {
-            parachutist.updateState(deltaTime);
+            parachutist.updateState(deltaTime); console.log("updated the camera and the position of the parachutist is :" , parachutist.position);
+            updateCameraPosition(parachutist.position.x ,parachutist.position.y ,  parachutist.position.z) ;
+           
         } else {
             if (airplane.mesh) {
                 parachutist.position.copy(airplane.mesh.position);
