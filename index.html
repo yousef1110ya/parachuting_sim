@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurations</title>
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Configurations</h1>
+        <form id="config-form">
+            <h2>Airplane</h2>
+            <label for="airplane-velocity-x">Velocity X:</label>
+            <input type="number" id="airplane-velocity-x" name="airplane-velocity-x" step="0.1" value="150">
+
+            <h2>Parachutist</h2>
+            <label for="parachutist-mass">Mass (kg):</label>
+            <input type="number" id="parachutist-mass" name="parachutist-mass" step="0.1" value="80">
+            <label for="parachutist-drag-coefficient">Drag Coefficient:</label>
+            <input type="number" id="parachutist-drag-coefficient" name="parachutist-drag-coefficient" step="0.001" value="0.5">
+            <label for="parachutist-surface-area">Surface Area (m^2):</label>
+            <input type="number" id="parachutist-surface-area" name="parachutist-surface-area" step="0.001" value="1">
+
+            <h2>Environment</h2>
+            <label for="wind-x">Wind X (m/s):</label>
+            <input type="number" id="wind-x" name="wind-x" step="0.001" value="15">
+            <label for="wind-z">Wind Z (m/s):</label>
+            <input type="number" id="wind-z" name="wind-z" step="0.001" value="10">
+
+            <button type="submit">Start Simulation</button>
+        </form>
+    </div>
+    <script type="module" src="/src/config.js"></script>
+</body>
+</html>
