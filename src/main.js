@@ -67,7 +67,7 @@ Promise.all([
 
         if (parachutist.hasJumped) {
             parachutist.updateState(deltaTime); console.log("updated the camera and the position of the parachutist is :" , parachutist.position);
-            updateCameraPosition(parachutist.position.x ,parachutist.position.y ,  parachutist.position.z) ;
+            updateCameraPosition(parachutist.position, parachutist.velocity, 0.01) ;
            
         } else {
             if (airplane.mesh) {

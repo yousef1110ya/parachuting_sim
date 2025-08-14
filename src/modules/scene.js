@@ -24,13 +24,32 @@ sunLight.shadow.mapSize.height = 4096;
 sunLight.shadow.camera.far = 1200;
 scene.add(sunLight);
 
-function updateCameraPosition(x, y, z) {
-    camera.position.set(
-        x,
-        y + 3,
-        z + 10 
-    );
+const cameraTargetPos = new THREE.Vector3();
+const cameraLookAtPos = new THREE.Vector3();
+const worldUp = new THREE.Vector3(0, 1, 0);
+const bankAxis = new THREE.Vector3();
 
-    camera.lookAt(new THREE.Vector3(x, y, z));
+function updateCameraPosition(parachutistPosition, parachutistVelocity, damping = 0.05) {
+    if (parachutistVelocity.lengthSq() === 0) return;
+
+    const dir = parachutistVelocity.clone().normalize();
+
+    cameraTargetPos.copy(parachutistPosition)
+        .addScaledVector(dir, -30) // behind
+        .add(new THREE.Vector3(0, 10, 0)); // above
+    camera.position.lerp(cameraTargetPos, damping);
+
+    cameraLookAtPos.copy(parachutistPosition).addScaledVector(dir, 50);
+    const smoothLookAt = new THREE.Vector3().lerpVectors(
+        cameraLookAtPos,
+        camera.getWorldDirection(new THREE.Vector3()).add(camera.position),
+        damping
+    );
+    camera.lookAt(smoothLookAt);
+
+    bankAxis.crossVectors(worldUp, dir).normalize();
+    const bankAmount = parachutistVelocity.clone().normalize().cross(worldUp).length() * 0.2; // tweak factor
+    camera.up.lerp(bankAxis.multiplyScalar(bankAmount).add(worldUp).normalize(), damping);
 }
+
 export { scene, camera, renderer, ambientLight, sunLight, updateCameraPosition };
