@@ -26,6 +26,12 @@ function getAirDensity(altitude) {
     return 1.2250; // Sea level
 }
 
+function draw_vector(scene , v, color = 0xff0000){
+  const dir = v.clone().normalize(); 
+  const length = v.length(); 
+  scene.add(new THREE.ArrowHelper(dir , new THREE.Vector3(0,0,0),length,color)); 
+}
+
 class Parachutist {
   constructor(mass, dragCoefficient, surfaceArea) {
     this.mass = mass;
@@ -42,7 +48,7 @@ class Parachutist {
     this.flaring = false;
     this.steeringForce = new THREE.Vector3(0, 0, 0);
     this.wind = new THREE.Vector3(15, 0, 10);
-
+    this.velocityArrow = null ; 
     this.mesh = null;
     this.parachute = null;
         this.posture = Postures.HEAD_DOWN; // Default posture is now Head-Down
@@ -63,10 +69,15 @@ class Parachutist {
                   this.parachute.visible = false;
                   this.parachute.traverse(node => { if (node.isMesh) node.castShadow = true; });
                   this.mesh.add(this.parachute);
+                  const dir = this.velocity.clone().normalize(); 
+                  const length = this.velocity.length(); 
+                  this.velocityArrow = new THREE.ArrowHelper(dir , this.position.clone() , length , 0xff0000);
+                  scene.add(this.velocityArrow); 
                   this.setPosture(this.posture); // Apply initial posture
                   resolve();
               });
           });
+          draw_vector(scene , this.velocity);
       });
   }
 
@@ -189,6 +200,13 @@ class Parachutist {
 
     if (this.mesh) {
         this.mesh.position.copy(this.position);
+    }
+    if (this.velocityArrow) {
+      const dir = this.velocity.clone().normalize();
+      const length = this.velocity.length();
+      this.velocityArrow.setDirection(dir);
+      this.velocityArrow.setLength(length);
+      this.velocityArrow.position.copy(this.position);
     }
   }
 }
