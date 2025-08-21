@@ -195,20 +195,28 @@ class Parachutist {
     const dragMagnitude = 0.5 * airDensity * apparentVelocity.lengthSq() * this.dragCoefficient * this.surfaceArea;
     const dragForce = apparentVelocity.clone().negate().normalize().multiplyScalar(dragMagnitude);
 
-    const totalForce = new THREE.Vector3().addVectors(gravitationalForce, dragForce);
+    const totalForce = gravitationalForce.clone();
 
-    // Canopy open: glide forward along heading and add lateral from bank
     if (this.parachuteDeployed) {
+        // Decompose drag: strong vertical damping, reduced horizontal damping
+        const horizDrag = new THREE.Vector3(dragForce.x, 0, dragForce.z).multiplyScalar(0.25);
+        const vertDrag = new THREE.Vector3(0, dragForce.y, 0);
+        totalForce.add(horizDrag).add(vertDrag);
+
+        // Add glide forward along heading and slight lateral from bank
         const forwardDir = new THREE.Vector3(Math.sin(this.headingYaw), 0, Math.cos(this.headingYaw));
         const up = new THREE.Vector3(0, 1, 0);
-        const right = new THREE.Vector3().crossVectors(forwardDir, up).normalize();
+        const rightDir = new THREE.Vector3().crossVectors(forwardDir, up).normalize();
 
-        const glideForce = 500; // N forward to maintain glide
+        const glideForce = 1400; // N forward
         totalForce.addScaledVector(forwardDir, glideForce);
 
-        const lateralForce = 200 * this.steeringInput; // N side force from bank
-        this.steeringForce.copy(right).multiplyScalar(lateralForce);
+        const lateralForce = 500 * this.steeringInput; // N side
+        this.steeringForce.copy(rightDir).multiplyScalar(lateralForce);
         totalForce.add(this.steeringForce);
+    } else {
+        // Freefall: use full drag
+        totalForce.add(dragForce);
     }
 
     return totalForce;
@@ -222,7 +230,7 @@ class Parachutist {
 
     // Integrate heading from steering input (keeps new direction after release)
     if (this.parachuteDeployed) {
-      const maxYawRate = THREE.MathUtils.degToRad(45); // rad/s
+      const maxYawRate = THREE.MathUtils.degToRad(90); // rad/s, faster heading response
       this.headingYaw += this.steeringInput * maxYawRate * deltaTime;
     }
 
