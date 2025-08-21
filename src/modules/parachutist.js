@@ -57,6 +57,7 @@ class Parachutist {
     this.rightLine = null;
     this.scene = null;
     this.lastVelocityDir = new THREE.Vector3(1, 0, 0);
+    this.headingYaw = 0; // radians: canopy heading around world Y
   }
 
   load(scene) {
@@ -156,6 +157,8 @@ class Parachutist {
       if (this.parachute) this.parachute.visible = true;
       if (this.leftLine) this.leftLine.visible = true;
       if (this.rightLine) this.rightLine.visible = true;
+      const hv = this.velocity.clone(); hv.y = 0;
+      this.headingYaw = hv.lengthSq() > 1e-4 ? Math.atan2(hv.x, hv.z) : (this.mesh ? this.mesh.rotation.y : 0);
       console.log("Parachute deployed!");
     }
   }
@@ -194,19 +197,17 @@ class Parachutist {
 
     const totalForce = new THREE.Vector3().addVectors(gravitationalForce, dragForce);
 
-    // Steering only when canopy open: apply lateral force based on input and current heading
+    // Canopy open: glide forward along heading and add lateral from bank
     if (this.parachuteDeployed) {
-        const forward = this.velocity.clone();
-        forward.y = 0;
-        if (forward.lengthSq() < 1e-4) {
-          forward.set(0, 0, 1);
-        } else {
-          forward.normalize();
-        }
+        const forwardDir = new THREE.Vector3(Math.sin(this.headingYaw), 0, Math.cos(this.headingYaw));
         const up = new THREE.Vector3(0, 1, 0);
-        const right = new THREE.Vector3().crossVectors(forward, up).normalize();
-        const turnStrength = 600; // N per unit input
-        this.steeringForce.copy(right).multiplyScalar(this.steeringInput * turnStrength);
+        const right = new THREE.Vector3().crossVectors(forwardDir, up).normalize();
+
+        const glideForce = 500; // N forward to maintain glide
+        totalForce.addScaledVector(forwardDir, glideForce);
+
+        const lateralForce = 200 * this.steeringInput; // N side force from bank
+        this.steeringForce.copy(right).multiplyScalar(lateralForce);
         totalForce.add(this.steeringForce);
     }
 
@@ -217,6 +218,12 @@ class Parachutist {
     if (this.position.y <= 0) {
         this.wind.x = 0;
         this.wind.z = 0;
+    }
+
+    // Integrate heading from steering input (keeps new direction after release)
+    if (this.parachuteDeployed) {
+      const maxYawRate = THREE.MathUtils.degToRad(45); // rad/s
+      this.headingYaw += this.steeringInput * maxYawRate * deltaTime;
     }
 
     const totalForce = this.calculateForces();
@@ -243,7 +250,7 @@ class Parachutist {
       this.velocityArrow.position.copy(this.position);
     }
 
-    // Visuals: bank canopy and yaw body towards travel direction while steering
+    // Visuals: bank canopy and yaw body towards heading
     this.updateParachuteVisuals(deltaTime);
   }
 }
@@ -258,21 +265,17 @@ Parachutist.prototype.updateParachuteVisuals = function(deltaTime) {
   const steeringNorm = this.steeringInput; // use input directly for visuals
 
   if (this.parachute) {
-    const targetBank = -steeringNorm * maxBankRadians; // A pulls left -> bank left
+    const targetBank = steeringNorm * maxBankRadians; // left input -> bank left
     const bankError = targetBank - this.parachute.rotation.z;
     this.parachute.rotation.z += bankError * Math.min(1, smoothing * deltaTime);
   }
 
-  const horizontalVelocity = this.velocity.clone();
-  horizontalVelocity.y = 0;
-  if (horizontalVelocity.lengthSq() > 1e-4) {
-    const targetYaw = Math.atan2(horizontalVelocity.x, horizontalVelocity.z);
-    const currentYaw = this.mesh.rotation.y;
-    let yawDelta = targetYaw - currentYaw;
-    yawDelta = Math.atan2(Math.sin(yawDelta), Math.cos(yawDelta));
-    const maxStep = maxYawRate * deltaTime * (0.5 + Math.abs(steeringNorm));
-    this.mesh.rotation.y += THREE.MathUtils.clamp(yawDelta, -maxStep, maxStep);
-  }
+  // Smoothly align body with heading
+  const currentYaw = this.mesh.rotation.y;
+  let yawDelta = this.headingYaw - currentYaw;
+  yawDelta = Math.atan2(Math.sin(yawDelta), Math.cos(yawDelta));
+  const maxStep = maxYawRate * deltaTime * (0.5 + Math.abs(steeringNorm));
+  this.mesh.rotation.y += THREE.MathUtils.clamp(yawDelta, -maxStep, maxStep);
 
   // Update steering line geometry to reflect handle pulls
   this.updateSteeringLines(steeringNorm);
