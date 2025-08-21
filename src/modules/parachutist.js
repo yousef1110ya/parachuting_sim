@@ -199,21 +199,30 @@ class Parachutist {
 
     if (this.parachuteDeployed) {
         // Decompose drag: strong vertical damping, reduced horizontal damping
-        const horizDrag = new THREE.Vector3(dragForce.x, 0, dragForce.z).multiplyScalar(0.25);
+        const horizDrag = new THREE.Vector3(dragForce.x, 0, dragForce.z).multiplyScalar(0.3);
         const vertDrag = new THREE.Vector3(0, dragForce.y, 0);
         totalForce.add(horizDrag).add(vertDrag);
 
-        // Add glide forward along heading and slight lateral from bank
+        // Heading-aligned velocity control (PD-like)
         const forwardDir = new THREE.Vector3(Math.sin(this.headingYaw), 0, Math.cos(this.headingYaw));
         const up = new THREE.Vector3(0, 1, 0);
         const rightDir = new THREE.Vector3().crossVectors(forwardDir, up).normalize();
 
-        const glideForce = 1400; // N forward
-        totalForce.addScaledVector(forwardDir, glideForce);
+        const horizontalVel = this.velocity.clone(); horizontalVel.y = 0;
+        const forwardSpeed = horizontalVel.dot(forwardDir);
+        const lateralSpeed = horizontalVel.dot(rightDir);
 
-        const lateralForce = 500 * this.steeringInput; // N side
-        this.steeringForce.copy(rightDir).multiplyScalar(lateralForce);
-        totalForce.add(this.steeringForce);
+        const targetForwardSpeed = 14; // m/s desired glide speed
+        const forwardGain = 2.0; // 1/s
+        const lateralGain = 6.0; // 1/s stronger to kill sideslip
+
+        // Force = mass * gain * speed_error
+        totalForce.addScaledVector(forwardDir, this.mass * forwardGain * (targetForwardSpeed - forwardSpeed));
+        totalForce.addScaledVector(rightDir, this.mass * (-lateralGain * lateralSpeed));
+
+        // Small bank-induced lateral force to increase turn rate while input held
+        const bankAssist = 400 * this.steeringInput; // N
+        totalForce.addScaledVector(rightDir, bankAssist);
     } else {
         // Freefall: use full drag
         totalForce.add(dragForce);
