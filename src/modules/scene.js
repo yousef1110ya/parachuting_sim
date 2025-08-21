@@ -27,7 +27,6 @@ scene.add(sunLight);
 const cameraTargetPos = new THREE.Vector3();
 const cameraLookAtPos = new THREE.Vector3();
 const worldUp = new THREE.Vector3(0, 1, 0);
-const bankAxis = new THREE.Vector3();
 
 function updateCameraPosition(parachutistPosition, parachutistVelocity, damping = 0.05) {
     if (parachutistVelocity.lengthSq() === 0) return;
@@ -47,9 +46,8 @@ function updateCameraPosition(parachutistPosition, parachutistVelocity, damping 
     );
     camera.lookAt(smoothLookAt);
 
-    bankAxis.crossVectors(worldUp, dir).normalize();
-    const bankAmount = parachutistVelocity.clone().normalize().cross(worldUp).length() * 0.2; // tweak factor
-    camera.up.lerp(bankAxis.multiplyScalar(bankAmount).add(worldUp).normalize(), damping);
+    // Keep camera horizon level to avoid tilting the whole world
+    camera.up.copy(worldUp);
 }
 
 export { scene, camera, renderer, ambientLight, sunLight, updateCameraPosition };

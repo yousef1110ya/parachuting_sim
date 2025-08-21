@@ -47,15 +47,21 @@ class Parachutist {
     this.parachuteDeployed = false;
     this.flaring = false;
     this.steeringForce = new THREE.Vector3(0, 0, 0);
+    this.steeringInput = 0; // -1..1 left/right command
     this.wind = new THREE.Vector3(15, 0, 10);
     this.velocityArrow = null ; 
     this.mesh = null;
     this.parachute = null;
         this.posture = Postures.HEAD_DOWN; // Default posture is now Head-Down
+    this.leftLine = null;
+    this.rightLine = null;
+    this.scene = null;
+    this.lastVelocityDir = new THREE.Vector3(1, 0, 0);
   }
 
   load(scene) {
       return new Promise((resolve) => {
+          this.scene = scene;
           loader.load('models/parachutist 1.glb', (gltf) => {
               this.mesh = gltf.scene;
               this.mesh.scale.set(5, 5, 5);
@@ -69,15 +75,27 @@ class Parachutist {
                   this.parachute.visible = false;
                   this.parachute.traverse(node => { if (node.isMesh) node.castShadow = true; });
                   this.mesh.add(this.parachute);
-                  const dir = this.velocity.clone().normalize(); 
-                  const length = this.velocity.length(); 
-                  this.velocityArrow = new THREE.ArrowHelper(dir , this.position.clone() , length , 0xff0000);
+                  const vLen = this.velocity.length();
+                  if (vLen > 0.0001) this.lastVelocityDir.copy(this.velocity).normalize();
+                  const length = Math.max(vLen, 1);
+                  this.velocityArrow = new THREE.ArrowHelper(this.lastVelocityDir.clone(), this.position.clone(), length, 0xff0000);
                   scene.add(this.velocityArrow); 
                   this.setPosture(this.posture); // Apply initial posture
+
+                  // Create steering line visuals (left/right)
+                  const lineMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+                  const leftGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                  const rightGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                  this.leftLine = new THREE.Line(leftGeom, lineMat);
+                  this.rightLine = new THREE.Line(rightGeom, lineMat);
+                  this.leftLine.visible = false;
+                  this.rightLine.visible = false;
+                  scene.add(this.leftLine);
+                  scene.add(this.rightLine);
+
                   resolve();
               });
           });
-          draw_vector(scene , this.velocity);
       });
   }
 
@@ -135,16 +153,19 @@ class Parachutist {
       this.dragCoefficient = 1.8;
       this.defaultDragCoefficient = 1.8;
       this.surfaceArea = 25;
+      if (this.parachute) this.parachute.visible = true;
+      if (this.leftLine) this.leftLine.visible = true;
+      if (this.rightLine) this.rightLine.visible = true;
       console.log("Parachute deployed!");
     }
   }
 
-  setSteering(direction) {
-    const steeringMagnitude = 100;
-    this.steeringForce.copy(direction).multiplyScalar(steeringMagnitude);
+  setSteeringInput(axis) {
+    this.steeringInput = THREE.MathUtils.clamp(axis, -1, 1);
   }
 
   clearSteering() {
+    this.steeringInput = 0;
     this.steeringForce.set(0, 0, 0);
   }
 
@@ -173,7 +194,19 @@ class Parachutist {
 
     const totalForce = new THREE.Vector3().addVectors(gravitationalForce, dragForce);
 
+    // Steering only when canopy open: apply lateral force based on input and current heading
     if (this.parachuteDeployed) {
+        const forward = this.velocity.clone();
+        forward.y = 0;
+        if (forward.lengthSq() < 1e-4) {
+          forward.set(0, 0, 1);
+        } else {
+          forward.normalize();
+        }
+        const up = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(forward, up).normalize();
+        const turnStrength = 600; // N per unit input
+        this.steeringForce.copy(right).multiplyScalar(this.steeringInput * turnStrength);
         totalForce.add(this.steeringForce);
     }
 
@@ -202,13 +235,80 @@ class Parachutist {
         this.mesh.position.copy(this.position);
     }
     if (this.velocityArrow) {
-      const dir = this.velocity.clone().normalize();
-      const length = this.velocity.length();
+      const vLen = this.velocity.length();
+      const dir = vLen > 0.0001 ? this.velocity.clone().normalize() : this.velocityArrow.getDirection(new THREE.Vector3());
+      const length = Math.max(vLen, 1);
       this.velocityArrow.setDirection(dir);
       this.velocityArrow.setLength(length);
       this.velocityArrow.position.copy(this.position);
     }
+
+    // Visuals: bank canopy and yaw body towards travel direction while steering
+    this.updateParachuteVisuals(deltaTime);
   }
 }
+
+Parachutist.prototype.updateParachuteVisuals = function(deltaTime) {
+  if (!this.parachuteDeployed || !this.mesh) return;
+
+  const maxBankRadians = THREE.MathUtils.degToRad(25);
+  const maxYawRate = THREE.MathUtils.degToRad(45); // deg/sec
+  const smoothing = 5; // higher = snappier
+
+  const steeringNorm = this.steeringInput; // use input directly for visuals
+
+  if (this.parachute) {
+    const targetBank = -steeringNorm * maxBankRadians; // A pulls left -> bank left
+    const bankError = targetBank - this.parachute.rotation.z;
+    this.parachute.rotation.z += bankError * Math.min(1, smoothing * deltaTime);
+  }
+
+  const horizontalVelocity = this.velocity.clone();
+  horizontalVelocity.y = 0;
+  if (horizontalVelocity.lengthSq() > 1e-4) {
+    const targetYaw = Math.atan2(horizontalVelocity.x, horizontalVelocity.z);
+    const currentYaw = this.mesh.rotation.y;
+    let yawDelta = targetYaw - currentYaw;
+    yawDelta = Math.atan2(Math.sin(yawDelta), Math.cos(yawDelta));
+    const maxStep = maxYawRate * deltaTime * (0.5 + Math.abs(steeringNorm));
+    this.mesh.rotation.y += THREE.MathUtils.clamp(yawDelta, -maxStep, maxStep);
+  }
+
+  // Update steering line geometry to reflect handle pulls
+  this.updateSteeringLines(steeringNorm);
+};
+
+Parachutist.prototype.updateSteeringLines = function(steeringNorm) {
+  if (!this.parachuteDeployed || !this.scene || !this.parachute || !this.mesh || !this.leftLine || !this.rightLine) return;
+
+  const maxHandleDrop = 1.0; // meters
+  const canopyOffsetY = 2.0;
+  const canopyOffsetX = 2.5;
+  const harnessOffsetY = 1.2;
+  const harnessOffsetX = 0.6;
+
+  // Canopy attachment points (world space)
+  const leftCanopy = this.parachute.localToWorld(new THREE.Vector3(-canopyOffsetX, canopyOffsetY, 0));
+  const rightCanopy = this.parachute.localToWorld(new THREE.Vector3(canopyOffsetX, canopyOffsetY, 0));
+
+  // Harness handle points (base in world space)
+  const baseLeftHandle = this.mesh.localToWorld(new THREE.Vector3(-harnessOffsetX, harnessOffsetY, 0.2));
+  const baseRightHandle = this.mesh.localToWorld(new THREE.Vector3(harnessOffsetX, harnessOffsetY, 0.2));
+
+  // Apply drop to the pulled side
+  const leftDrop = steeringNorm < 0 ? -steeringNorm * maxHandleDrop : 0;
+  const rightDrop = steeringNorm > 0 ? steeringNorm * maxHandleDrop : 0;
+
+  const leftHandle = baseLeftHandle.clone();
+  leftHandle.y -= leftDrop;
+  const rightHandle = baseRightHandle.clone();
+  rightHandle.y -= rightDrop;
+
+  // Update line geometries
+  this.leftLine.geometry.setFromPoints([leftCanopy, leftHandle]);
+  this.rightLine.geometry.setFromPoints([rightCanopy, rightHandle]);
+  this.leftLine.geometry.attributes.position.needsUpdate = true;
+  this.rightLine.geometry.attributes.position.needsUpdate = true;
+};
 
 export { Parachutist, Postures };

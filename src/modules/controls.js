@@ -1,5 +1,6 @@
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import * as THREE from 'three';
 
 function setupControls(camera, renderer, parachutist, airplane, parachute, planeFolder, parachutistFolder) {
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -19,11 +20,13 @@ function setupControls(camera, renderer, parachutist, airplane, parachute, plane
             parachutist.deployParachute();
             if(parachute) parachute.visible = true;
         }
-        if (event.code === 'KeyA' && parachutist.hasJumped) {
-            parachutist.setSteering(new THREE.Vector3(-1, 0, 0));
+        if (event.code === 'KeyA' && parachutist.parachuteDeployed) {
+            // A = steer left
+            parachutist.setSteeringInput(-1);
         }
-        if (event.code === 'KeyD' && parachutist.hasJumped) {
-            parachutist.setSteering(new THREE.Vector3(1, 0, 0));
+        if (event.code === 'KeyD' && parachutist.parachuteDeployed) {
+            // D = steer right
+            parachutist.setSteeringInput(1);
         }
         if (event.code === 'KeyS' && parachutist.hasJumped) {
             parachutist.flare();
