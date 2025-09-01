@@ -41,7 +41,7 @@ class Parachutist {
     this.surfaceArea = surfaceArea;
     this.defaultDragCoefficient = dragCoefficient;
 
-    this.position = new THREE.Vector3(0, 3000, 0);
+    this.position = new THREE.Vector3(0, 600, 0);
     this.velocity = new THREE.Vector3(0, 0, 0);
     this.acceleration = new THREE.Vector3(0, 0, 0);
 

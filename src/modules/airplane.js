@@ -16,7 +16,7 @@ class Airplane {
                 this.mesh.scale.set(20, 20, 20);
                 this.mesh.rotation.y = -Math.PI / 2;
                 this.mesh.traverse(node => { if (node.isMesh) node.castShadow = true; });
-                this.mesh.position.set(-1200, 3000*0.1, 0);
+                this.mesh.position.set(-2400, 600, 0);
                 scene.add(this.mesh);
 
                 // Create velocity arrow

@@ -5,7 +5,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100000);
-camera.position.set(-1200, 3080*0.1, 250*0.1);
+camera.position.set(-2400, 3080*0.2, 250*0.2);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -38,7 +38,7 @@ function updateCameraPosition(parachutistPosition, parachutistVelocity, damping 
         .add(new THREE.Vector3(0, 10, 0)); // above
     camera.position.lerp(cameraTargetPos, damping);
 
-    cameraLookAtPos.copy(parachutistPosition).addScaledVector(dir, 50);
+    cameraLookAtPos.copy(parachutistPosition).addScaledVector(dir, 100);
     const smoothLookAt = new THREE.Vector3().lerpVectors(
         cameraLookAtPos,
         camera.getWorldDirection(new THREE.Vector3()).add(camera.position),
@@ -51,3 +51,4 @@ function updateCameraPosition(parachutistPosition, parachutistVelocity, damping 
 }
 
 export { scene, camera, renderer, ambientLight, sunLight, updateCameraPosition };
+
