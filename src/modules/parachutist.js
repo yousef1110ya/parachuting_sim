@@ -63,6 +63,12 @@ class Parachutist {
     this.pitchAngle = 0;
     this.targetPitch = 0;
     this.bankAngle = 0;
+
+    // Animation properties
+    this.mixer = null;
+    this.animations = {};
+    this.landed = false;
+    this.activeAction = null;
   }
 
   load(scene) {
@@ -70,6 +76,14 @@ class Parachutist {
       this.scene = scene;
       loader.load("models/parachutist 1.glb", (gltf) => {
         this.mesh = gltf.scene;
+
+        // Setup animation mixer
+        this.mixer = new THREE.AnimationMixer(this.mesh);
+        gltf.animations.forEach((clip) => {
+          const clipName = clip.name.split('|')[1] || clip.name;
+          this.animations[clipName] = clip;
+        });
+
         this.mesh.scale.set(5, 5, 5);
         this.mesh.traverse((node) => {
           if (node.isMesh) node.castShadow = true;
@@ -289,6 +303,35 @@ class Parachutist {
   }
 
   updateState(deltaTime) {
+    if (this.mixer) {
+      this.mixer.update(deltaTime);
+    }
+
+    if (this.position.y <= 0 && !this.landed) {
+      this.landed = true;
+
+      const isHardLanding = !this.parachuteDeployed || this.velocity.y < -2;
+
+      if (isHardLanding) {
+        console.log(`Hard landing! (Parachute: ${this.parachuteDeployed}, Velocity Y: ${this.velocity.y.toFixed(2)})`);
+        this.position.y += 2;
+        this.velocity.set(0, 0, 0);
+        this.playAnimation('Death', false);
+      } else {
+        // Good landing
+        this.position.y = 0;
+        this.startLandingSequence();
+      }
+    }
+
+    if (this.landed) {
+      this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+      if (this.mesh) {
+        this.mesh.position.copy(this.position);
+      }
+      return; // Skip other physics while landing sequence is active
+    }
+    
     if (this.position.y <= 0) {
       this.wind.x = 0;
       this.wind.z = 0;
@@ -306,11 +349,7 @@ class Parachutist {
     this.velocity.add(this.acceleration.clone().multiplyScalar(deltaTime));
     this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
 
-    if (this.position.y < 0) {
-      this.position.y = 0;
-      this.velocity.set(0, 0, 0);
-      this.acceleration.set(0, 0, 0);
-    }
+    
 
     if (this.mesh) {
       this.mesh.position.copy(this.position);
@@ -330,10 +369,74 @@ class Parachutist {
     // Visuals: bank canopy and yaw body towards heading
     this.updateParachuteVisuals(deltaTime);
   }
+
+  playAnimation(name, loop = false) {
+    if (this.activeAction) {
+      this.activeAction.fadeOut(0.3);
+    }
+
+    const clip = this.animations[name];
+    if (!clip) {
+      console.warn(`Animation "${name}" not found!`);
+      return null;
+    }
+
+    const action = this.mixer.clipAction(clip);
+    action.reset();
+    action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
+    action.clampWhenFinished = !loop;
+    action.fadeIn(0.3).play();
+
+    this.activeAction = action;
+    return action;
+  }
+
+  startLandingSequence() {
+    console.log("Starting landing sequence...");
+    if (this.parachute) this.parachute.visible = false;
+    if (this.leftLine) this.leftLine.visible = false;
+    if (this.rightLine) this.rightLine.visible = false;
+    if (this.velocityArrow) this.velocityArrow.visible = false;
+
+    // Stop any physics calculations
+    this.acceleration.set(0, 0, 0);
+    this.dragCoefficient = 0; // No more air resistance
+
+    // Preserve landing direction
+    const landingDir = this.velocity.clone();
+    landingDir.y = 0;
+    if (landingDir.lengthSq() < 0.01) {
+      // If landing with no horizontal speed, just face forward
+      landingDir.set(0, 0, 1);
+    }
+    landingDir.normalize();
+
+    // Stop any parachute-related rotations and face movement direction
+    this.mesh.quaternion.identity();
+    this.mesh.rotation.y = Math.atan2(landingDir.x, landingDir.z);
+
+    // --- Animation Sequence ---
+
+    // 1. Run for 2 seconds
+    this.velocity.copy(landingDir).multiplyScalar(5); // 5 m/s run speed
+    this.playAnimation("Run", true); // Loop run animation
+
+    setTimeout(() => {
+      // 2. Walk for 3 seconds
+      this.velocity.copy(landingDir).multiplyScalar(1.5); // 1.5 m/s walk speed
+      this.playAnimation("Walk", true); // Loop walk animation
+
+      setTimeout(() => {
+        // 3. Wave forever
+        this.velocity.set(0, 0, 0);
+        this.playAnimation("Wave", true);
+      }, 3000); // 3 seconds of walking
+    }, 2000); // 2 seconds of running
+  }
 }
 
 Parachutist.prototype.updateParachuteVisuals = function (deltaTime) {
-  if (!this.parachuteDeployed || !this.mesh) return;
+  if (!this.parachuteDeployed || !this.mesh || this.landed) return;
 
   const smoothing = 5;
 
