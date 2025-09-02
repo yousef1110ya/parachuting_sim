@@ -317,6 +317,7 @@ class Parachutist {
           `Hard landing! (Parachute: ${this.parachuteDeployed}, Velocity Y: ${this.velocity.y.toFixed(2)})`,
         );
         this.position.y += 2;
+        this.parachute.visible = false;
         this.velocity.set(0, 0, 0);
         this.playAnimation("Death", false);
       } else {
