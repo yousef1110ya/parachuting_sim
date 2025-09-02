@@ -40,6 +40,22 @@ function setupGUI(parachutist, airplane) {
     windFolder.add(parachutist.wind, 'z', -50, 50, 0.001).name('Wind Z (m/s)');
     parachutistFolder.hide();
 
+    document.getElementById('velocity-arrow-toggle').addEventListener('change', (event) => {
+        parachutist.velocityArrow.visible = event.target.checked;
+    });
+
+    document.getElementById('gravity-arrow-toggle').addEventListener('change', (event) => {
+        parachutist.gravitationalForceArrow.visible = event.target.checked;
+    });
+
+    document.getElementById('drag-arrow-toggle').addEventListener('change', (event) => {
+        parachutist.dragForceArrow.visible = event.target.checked;
+    });
+
+    document.getElementById('total-force-arrow-toggle').addEventListener('change', (event) => {
+        parachutist.totalForceArrow.visible = event.target.checked;
+    });
+
     return { gui, guiState, planeFolder, parachutistFolder, dragController, surfaceAreaController };
 }
 
