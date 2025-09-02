@@ -30,7 +30,7 @@ function draw_vector(scene, v, color = 0xff0000) {
   const dir = v.clone().normalize();
   const length = v.length();
   scene.add(
-    new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), length, color)
+    new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), length, color),
   );
 }
 
@@ -80,11 +80,11 @@ class Parachutist {
         // Setup animation mixer
         this.mixer = new THREE.AnimationMixer(this.mesh);
         gltf.animations.forEach((clip) => {
-          const clipName = clip.name.split('|')[1] || clip.name;
+          const clipName = clip.name.split("|")[1] || clip.name;
           this.animations[clipName] = clip;
         });
 
-        this.mesh.scale.set(5, 5, 5);
+        this.mesh.scale.set(10, 10, 10);
         this.mesh.traverse((node) => {
           if (node.isMesh) node.castShadow = true;
         });
@@ -107,7 +107,7 @@ class Parachutist {
             this.lastVelocityDir.clone(),
             this.position.clone(),
             length,
-            0xff0000
+            0xff0000,
           );
           scene.add(this.velocityArrow);
           this.setPosture(this.posture); // Apply initial posture
@@ -198,8 +198,8 @@ class Parachutist {
         hv.lengthSq() > 1e-4
           ? Math.atan2(hv.x, hv.z)
           : this.mesh
-          ? this.mesh.rotation.y
-          : 0;
+            ? this.mesh.rotation.y
+            : 0;
       console.log("Parachute deployed!");
     }
   }
@@ -216,7 +216,7 @@ class Parachutist {
   flare() {
     if (this.parachuteDeployed && !this.flaring) {
       this.flaring = true;
-      this.targetPitch = THREE.MathUtils.degToRad(20); // Set target pitch for flare
+      this.targetPitch = THREE.MathUtils.degToRad(9); // Set target pitch for flare
       console.log("Flaring!");
     }
   }
@@ -252,7 +252,7 @@ class Parachutist {
       const horizDrag = new THREE.Vector3(
         dragForce.x,
         0,
-        dragForce.z
+        dragForce.z,
       ).multiplyScalar(0.3);
       const vertDrag = new THREE.Vector3(0, dragForce.y, 0);
       totalForce.add(horizDrag).add(vertDrag);
@@ -261,7 +261,7 @@ class Parachutist {
       const forwardDir = new THREE.Vector3(
         Math.sin(this.headingYaw),
         0,
-        Math.cos(this.headingYaw)
+        Math.cos(this.headingYaw),
       );
       const up = new THREE.Vector3(0, 1, 0);
       const rightDir = new THREE.Vector3()
@@ -280,11 +280,11 @@ class Parachutist {
       // Force = mass * gain * speed_error
       totalForce.addScaledVector(
         forwardDir,
-        this.mass * forwardGain * (targetForwardSpeed - forwardSpeed)
+        this.mass * forwardGain * (targetForwardSpeed - forwardSpeed),
       );
       totalForce.addScaledVector(
         rightDir,
-        this.mass * (-lateralGain * lateralSpeed)
+        this.mass * (-lateralGain * lateralSpeed),
       );
 
       // Small bank-induced lateral force to increase turn rate while input held
@@ -313,10 +313,12 @@ class Parachutist {
       const isHardLanding = !this.parachuteDeployed || this.velocity.y < -2;
 
       if (isHardLanding) {
-        console.log(`Hard landing! (Parachute: ${this.parachuteDeployed}, Velocity Y: ${this.velocity.y.toFixed(2)})`);
+        console.log(
+          `Hard landing! (Parachute: ${this.parachuteDeployed}, Velocity Y: ${this.velocity.y.toFixed(2)})`,
+        );
         this.position.y += 2;
         this.velocity.set(0, 0, 0);
-        this.playAnimation('Death', false);
+        this.playAnimation("Death", false);
       } else {
         // Good landing
         this.position.y = 0;
@@ -331,7 +333,7 @@ class Parachutist {
       }
       return; // Skip other physics while landing sequence is active
     }
-    
+
     if (this.position.y <= 0) {
       this.wind.x = 0;
       this.wind.z = 0;
@@ -348,8 +350,6 @@ class Parachutist {
     this.acceleration.copy(totalForce).divideScalar(this.mass);
     this.velocity.add(this.acceleration.clone().multiplyScalar(deltaTime));
     this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
-
-    
 
     if (this.mesh) {
       this.mesh.position.copy(this.position);
@@ -383,7 +383,10 @@ class Parachutist {
 
     const action = this.mixer.clipAction(clip);
     action.reset();
-    action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
+    action.setLoop(
+      loop ? THREE.LoopRepeat : THREE.LoopOnce,
+      loop ? Infinity : 1,
+    );
     action.clampWhenFinished = !loop;
     action.fadeIn(0.3).play();
 
@@ -455,21 +458,21 @@ Parachutist.prototype.updateParachuteVisuals = function (deltaTime) {
   // 1. Apply heading (Yaw) around the world Y axis
   const yawQ = new THREE.Quaternion().setFromAxisAngle(
     new THREE.Vector3(0, 1, 0),
-    this.headingYaw
+    this.headingYaw,
   );
   this.mesh.quaternion.multiply(yawQ);
 
   // 2. Apply pitch for flaring around the mesh's local X axis (its right/left axis)
   const pitchQ = new THREE.Quaternion().setFromAxisAngle(
     new THREE.Vector3(1, 0, 0),
-    -this.pitchAngle // Invert angle for visuals
+    -this.pitchAngle, // Invert angle for visuals
   );
   this.mesh.quaternion.multiply(pitchQ);
 
   // 3. Apply bank for steering around the mesh's local Z axis (its forward/backward axis)
   const rollQ = new THREE.Quaternion().setFromAxisAngle(
     new THREE.Vector3(0, 0, 1),
-    this.bankAngle
+    this.bankAngle,
   );
   this.mesh.quaternion.multiply(rollQ);
 
@@ -496,18 +499,18 @@ Parachutist.prototype.updateSteeringLines = function (steeringNorm) {
 
   // Canopy attachment points (world space)
   const leftCanopy = this.parachute.localToWorld(
-    new THREE.Vector3(-canopyOffsetX, canopyOffsetY, 0)
+    new THREE.Vector3(-canopyOffsetX, canopyOffsetY, 0),
   );
   const rightCanopy = this.parachute.localToWorld(
-    new THREE.Vector3(canopyOffsetX, canopyOffsetY, 0)
+    new THREE.Vector3(canopyOffsetX, canopyOffsetY, 0),
   );
 
   // Harness handle points (base in world space)
   const baseLeftHandle = this.mesh.localToWorld(
-    new THREE.Vector3(-harnessOffsetX, harnessOffsetY, 0.2)
+    new THREE.Vector3(-harnessOffsetX, harnessOffsetY, 0.2),
   );
   const baseRightHandle = this.mesh.localToWorld(
-    new THREE.Vector3(harnessOffsetX, harnessOffsetY, 0.2)
+    new THREE.Vector3(harnessOffsetX, harnessOffsetY, 0.2),
   );
 
   // Apply drop to the pulled side
@@ -527,3 +530,4 @@ Parachutist.prototype.updateSteeringLines = function (steeringNorm) {
 };
 
 export { Parachutist, Postures };
+
